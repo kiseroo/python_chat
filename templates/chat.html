@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат програм</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background-color: #4267B2;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        .users-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .users-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .message-area {
+            flex: 1;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .message-timestamp {
+            color: #777;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .message-sender {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .message-content {
+            display: inline;
+        }
+        .input-area {
+            display: flex;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 10px;
+        }
+        .message-input {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-size: 14px;
+            outline: none;
+        }
+        .send-button {
+            background-color: #4267B2;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-left: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .send-button:hover {
+            background-color: #365899;
+        }
+        .logout-button {
+            background-color: transparent;
+            color: white;
+            border: 1px solid white;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .logout-button:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        .system-message {
+            color: #777;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Чат програм - {{ username }}</h1>
+        <a href="/logout" class="logout-button">Гарах</a>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <h3>Идэвхтэй хэрэглэгчид</h3>
+            <ul class="users-list" id="users-list">
+                <!-- Хэрэглэгчдийн жагсаалт JavaScript-ээр оруулна -->
+            </ul>
+        </div>
+        
+        <div class="chat-container">
+            <div class="message-area" id="message-area">
+                <!-- Мессежүүд JavaScript-ээр оруулна -->
+            </div>
+            
+            <div class="input-area">
+                <input type="text" class="message-input" id="message-input" placeholder="Мессеж бичих...">
+                <button class="send-button" id="send-button">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const messageArea = document.getElementById('message-area');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const usersList = document.getElementById('users-list');
+            
+            // Initial messages load
+            fetchMessages(true);
+            
+            // Update active users
+            fetchActiveUsers();
+            
+            // Set up polling for new messages
+            setInterval(() => {
+                fetchMessages(false);
+            }, 2000);
+            
+            // Set up polling for active users
+            setInterval(() => {
+                fetchActiveUsers();
+            }, 10000);
+            
+            // Send button click handler
+            sendButton.addEventListener('click', sendMessage);
+            
+            // Enter key handler
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            function sendMessage() {
+                const content = messageInput.value.trim();
+                if (!content) return;
+                
+                // Send the message to server
+                fetch('/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `content=${encodeURIComponent(content)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        messageInput.value = '';
+                    }
+                })
+                .catch(error => console.error('Error sending message:', error));
+            }
+            
+            function fetchMessages(firstLoad) {
+                let url = '/messages';
+                if (firstLoad) {
+                    url += '?first_load=true';
+                }
+                
+                fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            addMessageToUI(msg);
+                        });
+                        
+                        // Scroll to bottom
+                        messageArea.scrollTop = messageArea.scrollHeight;
+                    }
+                })
+                .catch(error => console.error('Error fetching messages:', error));
+            }
+            
+            function fetchActiveUsers() {
+                fetch('/active_users')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateUsersList(data.users);
+                    }
+                })
+                .catch(error => console.error('Error fetching users:', error));
+            }
+            
+            function addMessageToUI(messageText) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                
+                // Check if it's a system message
+                if (messageText.includes('Систем:')) {
+                    messageDiv.classList.add('system-message');
+                }
+                
+                // Format the message
+                // Extract timestamp [YYYY-MM-DD HH:MM:SS]
+                const timestampMatch = messageText.match(/\[(.*?)\]/);
+                if (timestampMatch) {
+                    const timestampSpan = document.createElement('span');
+                    timestampSpan.className = 'message-timestamp';
+                    timestampSpan.textContent = timestampMatch[0] + ' ';
+                    messageDiv.appendChild(timestampSpan);
+                    
+                    // Remove timestamp from message text
+                    messageText = messageText.replace(timestampMatch[0] + ' ', '');
+                }
+                
+                // Extract sender
+                const senderMatch = messageText.match(/(.*?):/);
+                if (senderMatch) {
+                    const senderSpan = document.createElement('span');
+                    senderSpan.className = 'message-sender';
+                    senderSpan.textContent = senderMatch[1] + ':';
+                    messageDiv.appendChild(senderSpan);
+                    
+                    // Get content (everything after sender:)
+                    const content = messageText.substring(senderMatch[0].length).trim();
+                    const contentSpan = document.createElement('span');
+                    contentSpan.className = 'message-content';
+                    contentSpan.textContent = ' ' + content;
+                    messageDiv.appendChild(contentSpan);
+                } else {
+                    // If can't parse, just show the whole message
+                    const contentSpan = document.createElement('span');
+                    contentSpan.className = 'message-content';
+                    contentSpan.textContent = messageText;
+                    messageDiv.appendChild(contentSpan);
+                }
+                
+                messageArea.appendChild(messageDiv);
+            }
+            
+            function updateUsersList(users) {
+                usersList.innerHTML = '';
+                users.forEach(user => {
+                    const li = document.createElement('li');
+                    li.textContent = user;
+                    usersList.appendChild(li);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
